@@ -1,4 +1,4 @@
-local Players = game:GetService("Players")
+ocal Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
@@ -33,7 +33,6 @@ local ColorMap = {
     Olive = Color3.fromRGB(128, 128, 0),
     Beige = Color3.fromRGB(245, 245, 220)
 }
-
 if MiscSettings.Intro then
     local Flash = Instance.new("ColorCorrectionEffect")
     local Blur = Instance.new("BlurEffect")
