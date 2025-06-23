@@ -57,6 +57,7 @@ if MiscSettings.Intro then
         local drift = math.random(-5, 5) / 100
         local fallTime = math.random(4, 7)
         local target = UDim2.new(flake.Position.X.Scale + drift, 0, 1.1, 0)
+
         Tween:Create(flake, TweenInfo.new(fallTime, Enum.EasingStyle.Linear), {Position = target}):Play()
         task.delay(fallTime, function()
             if flake then flake:Destroy() end
@@ -86,10 +87,14 @@ if MiscSettings.Intro then
     coroutine.wrap(function()
         for i = 1, 6 do
             local offset = (i % 2 == 0) and -5 or 5
-            Tween:Create(Image, TweenInfo.new(0.05), {Position = originalPos + UDim2.new(0, offset, 0, 0)}):Play()
+            Tween:Create(Image, TweenInfo.new(0.05), {
+                Position = originalPos + UDim2.new(0, offset, 0, 0)
+            }):Play()
             task.wait(0.05)
         end
-        Tween:Create(Image, TweenInfo.new(0.1), {Position = originalPos}):Play()
+        Tween:Create(Image, TweenInfo.new(0.1), {
+            Position = originalPos
+        }):Play()
     end)()
     task.wait(1)
     Tween:Create(Image, TweenInfo.new(3), {ImageTransparency = 1}):Play()
@@ -99,14 +104,12 @@ if MiscSettings.Intro then
     Flash:Destroy()
     Blur:Destroy()
 end
-
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Color = ColorMap[Settings.FOVColor] or Color3.fromRGB(255, 0, 0)
 FOVCircle.Thickness = 1.5
 FOVCircle.NumSides = 100
 FOVCircle.Filled = false
 FOVCircle.Visible = false
-
 RunService.RenderStepped:Connect(function()
     FOVCircle.Visible = Settings.Enabled and Settings.ShowFOV
     if FOVCircle.Visible then
@@ -115,7 +118,6 @@ RunService.RenderStepped:Connect(function()
         FOVCircle.Radius = Settings.FOV
     end
 end)
-
 local function GetClosestPart(character)
     local closestPart, shortestDist = nil, math.huge
     local mousePos = UserInputService:GetMouseLocation()
@@ -133,13 +135,17 @@ local function GetClosestPart(character)
     end
     return closestPart
 end
-
 local function GetClosestTarget()
     local closestPlayer, shortestDistance = nil, Settings.FOV
     local mousePos = UserInputService:GetMouseLocation()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local part = Settings.ClosestPart and GetClosestPart(player.Character) or (Settings.AimPart == "Torso" and (player.Character:FindFirstChild("Torso") or player.Character:FindFirstChild("UpperTorso"))) or player.Character:FindFirstChild(Settings.AimPart)
+            local part
+            if Settings.ClosestPart then
+                part = GetClosestPart(player.Character)
+            else
+                part = (Settings.AimPart == "Torso" and (player.Character:FindFirstChild("Torso") or player.Character:FindFirstChild("UpperTorso"))) or player.Character:FindFirstChild(Settings.AimPart)
+            end
             if part then
                 local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
                 if onScreen then
@@ -163,7 +169,6 @@ local function GetClosestTarget()
     end
     return closestPlayer
 end
-
 local mt = getrawmetatable(game)
 setreadonly(mt, false)
 local oldIndex = mt.__index
@@ -172,7 +177,12 @@ mt.__index = function(self, key)
     if self == Mouse and key == "Hit" and Settings.Enabled then
         local target = GetClosestTarget()
         if target and target.Character then
-            local part = Settings.ClosestPart and GetClosestPart(target.Character) or (Settings.AimPart == "Torso" and (target.Character:FindFirstChild("Torso") or target.Character:FindFirstChild("UpperTorso"))) or target.Character:FindFirstChild(Settings.AimPart)
+            local part
+            if Settings.ClosestPart then
+                part = GetClosestPart(target.Character)
+            else
+                part = (Settings.AimPart == "Torso" and (target.Character:FindFirstChild("Torso") or target.Character:FindFirstChild("UpperTorso"))) or target.Character:FindFirstChild(Settings.AimPart)
+            end
             if part then
                 return CFrame.new(part.Position + part.Velocity * Settings.Prediction)
             end
@@ -180,10 +190,8 @@ mt.__index = function(self, key)
     end
     return oldIndex(self, key)
 end
-
 local speedEnabled = false
 local targetVelocity = Vector3.zero
-
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed then
         if input.KeyCode == Enum.KeyCode[SpeedSettings.Keybind] then
@@ -193,17 +201,19 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid") then
                 local humanoid = character.Humanoid
                 if humanoid.FloorMaterial ~= Enum.Material.Air then
-                    character.HumanoidRootPart.Velocity = Vector3.new(character.HumanoidRootPart.Velocity.X, SpeedSettings.JumpPower, character.HumanoidRootPart.Velocity.Z)
+                    character.HumanoidRootPart.Velocity = Vector3.new(
+                        character.HumanoidRootPart.Velocity.X,
+                        SpeedSettings.JumpPower,
+                        character.HumanoidRootPart.Velocity.Z
+                    )
                 end
             end
         end
     end
 end)
-
 local function lerpVec3(a, b, t)
     return a + (b - a) * t
 end
-
 RunService.RenderStepped:Connect(function(delta)
     if not SpeedSettings.Enabled then return end
     local character = LocalPlayer.Character
@@ -222,5 +232,154 @@ RunService.RenderStepped:Connect(function(delta)
         end
     else
         targetVelocity = Vector3.zero
+    end
+end)
+local TriggerBotSettings = getgenv().spectra.TriggerBot
+local JAIROUGH = false
+local LastShotTime = 0
+local function isHoldingKnife()
+    local character = LocalPlayer.Character
+    if not character then return false end
+    local tool = character:FindFirstChildOfClass("Tool")
+    if tool then
+        for _, blacklistedWeapon in ipairs(TriggerBotSettings.Blacklisted) do
+            if string.find(tool.Name:lower(), blacklistedWeapon:lower()) then
+                return true
+            end
+        end
+    end
+    return false
+end
+local function isDead(player)
+    local character = player.Character
+    if not character then return false end
+    local bodyEffects = character:FindFirstChild("BodyEffects")
+    if not bodyEffects then return false end
+    local ko = bodyEffects:FindFirstChild("K.O") or bodyEffects:FindFirstChild("KO")
+    return ko and ko.Value or false
+end
+local function getTargetUnderCursor()
+    local target = Mouse.Target
+    if target then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and target:IsDescendantOf(player.Character) then
+                if not isDead(player) then
+                    return player
+                end
+            end
+        end
+    end
+    return nil
+end
+local function TriggerBot()
+    while JAIROUGH and TriggerBotSettings.Enabled do
+        local currentTime = tick()
+        local targetPlayer = getTargetUnderCursor()
+        if targetPlayer and LocalPlayer.Character and not isHoldingKnife() then
+            local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+            if tool and tool:FindFirstChild("Handle") then
+                if (currentTime - LastShotTime) >= TriggerBotSettings.FireRate then
+                    LastShotTime = currentTime
+                    tool:Activate()
+                end
+            end
+        end
+        RunService.RenderStepped:Wait()
+    end
+end
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode[TriggerBotSettings.Keybind] then
+        JAIROUGH = not JAIROUGH
+        if JAIROUGH then
+            coroutine.wrap(TriggerBot)()
+        end
+    end
+end)
+local CamlockSettings = getgenv().spectra.Camlock
+local camlockActive = false
+local currentTarget = nil
+local lockedOnce = false
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode[CamlockSettings.Keybind] then
+        if CamlockSettings.ToggleMode == "Toggle" then
+            camlockActive = not camlockActive
+        elseif CamlockSettings.ToggleMode == "Hold" then
+            camlockActive = true
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode[CamlockSettings.Keybind] and CamlockSettings.ToggleMode == "Hold" then
+        camlockActive = false
+    end
+end)
+RunService.RenderStepped:Connect(function()
+    if not (CamlockSettings.Enabled and camlockActive) then
+        currentTarget = nil
+        lockedOnce = false
+        return
+    end
+
+    if lockedOnce and currentTarget and currentTarget.Character then return end
+
+    local closestPlayer = nil
+    local shortestDist = CamlockSettings.FOV
+    local mousePos = UserInputService:GetMouseLocation()
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local part = player.Character:FindFirstChild(CamlockSettings.AimPart)
+            if part then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if dist < shortestDist then
+                        shortestDist = dist
+                        closestPlayer = player
+                    end
+                end
+            end
+        end
+    end
+
+    currentTarget = closestPlayer
+    lockedOnce = true
+end)
+RunService.RenderStepped:Connect(function()
+    if not (CamlockSettings.Enabled and camlockActive and currentTarget and currentTarget.Character) then return end
+
+    local part = currentTarget.Character:FindFirstChild(CamlockSettings.AimPart)
+    if part then
+        local predictedPosition = part.Position + (part.Velocity * CamlockSettings.Prediction)
+        local targetCF = CFrame.new(Camera.CFrame.Position, predictedPosition)
+
+        if CamlockSettings.Smoothness then
+            Camera.CFrame = Camera.CFrame:Lerp(targetCF, math.clamp(CamlockSettings.Smoothing / 100, 0.01, 1))
+        else
+            Camera.CFrame = targetCF
+        end
+    end
+end)
+local ResolverSettings = getgenv().spectra.Misc.Resolver
+local ResolverActive = false
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode[ResolverSettings.Keybind] then
+        ResolverActive = not ResolverActive
+    end
+end)
+RunService.Heartbeat:Connect(function()
+    if ResolverSettings.Enabled and ResolverActive then
+        pcall(function()
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    local hrp = player.Character.HumanoidRootPart
+                    hrp.Velocity = Vector3.new(hrp.Velocity.X, 0, hrp.Velocity.Z)
+                    hrp.AssemblyLinearVelocity = Vector3.new(hrp.Velocity.X, 0, hrp.Velocity.Z)
+                end
+            end
+        end)
     end
 end)
